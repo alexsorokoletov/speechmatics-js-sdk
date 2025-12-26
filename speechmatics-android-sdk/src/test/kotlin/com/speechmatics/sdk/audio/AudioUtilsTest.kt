@@ -24,10 +24,10 @@ class AudioUtilsTest {
         val shorts = floats.toShortArray()
 
         assertThat(shorts[0]).isEqualTo(0)
-        assertThat(shorts[1]).isEqualTo(16384.toShort())
-        assertThat(shorts[2]).isEqualTo((-16384).toShort())
+        assertThat(shorts[1]).isEqualTo(16383.toShort()) // 0.5 * 32767 = 16383.5 → 16383
+        assertThat(shorts[2]).isEqualTo((-16383).toShort())
         assertThat(shorts[3]).isEqualTo(Short.MAX_VALUE)
-        assertThat(shorts[4]).isEqualTo((-Short.MAX_VALUE).toShort())
+        assertThat(shorts[4]).isEqualTo((-32767).toShort()) // -1f * 32767 = -32767
     }
 
     @Test

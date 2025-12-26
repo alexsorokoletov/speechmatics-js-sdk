@@ -9,18 +9,17 @@ import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertThrows
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SpeechmaticsAuthTest {
 
     private lateinit var mockServer: MockWebServer
 
-    @BeforeAll
+    @BeforeEach
     fun setup() {
         mockServer = MockWebServer()
         mockServer.start()
     }
 
-    @AfterAll
+    @AfterEach
     fun teardown() {
         mockServer.shutdown()
     }

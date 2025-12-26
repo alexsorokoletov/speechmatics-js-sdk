@@ -10,30 +10,25 @@ import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertThrows
 import java.io.File
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class BatchClientTest {
 
     private lateinit var mockServer: MockWebServer
     private lateinit var client: BatchClient
 
-    @BeforeAll
+    @BeforeEach
     fun setup() {
         mockServer = MockWebServer()
         mockServer.start()
-    }
-
-    @AfterAll
-    fun teardown() {
-        mockServer.shutdown()
-    }
-
-    @BeforeEach
-    fun setupClient() {
         client = BatchClient(
             apiKey = "test-api-key",
             apiUrl = mockServer.url("").toString().removeSuffix("/"),
             appId = "test-app"
         )
+    }
+
+    @AfterEach
+    fun teardown() {
+        mockServer.shutdown()
     }
 
     @Test

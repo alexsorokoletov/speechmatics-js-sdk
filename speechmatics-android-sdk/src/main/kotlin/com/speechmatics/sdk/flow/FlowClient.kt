@@ -372,8 +372,10 @@ class FlowClient(
     }
 
     private fun disconnectSocket() {
-        _socketState.value = SocketState.CLOSING
-        webSocket?.close(1000, "Normal closure")
+        webSocket?.let {
+            _socketState.value = SocketState.CLOSING
+            it.close(1000, "Normal closure")
+        }
         webSocket = null
     }
 }

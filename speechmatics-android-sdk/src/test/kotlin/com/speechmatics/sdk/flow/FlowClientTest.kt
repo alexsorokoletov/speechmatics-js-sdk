@@ -5,6 +5,8 @@ import com.speechmatics.sdk.common.FlowErrorType
 import com.speechmatics.sdk.common.SocketState
 import com.speechmatics.sdk.common.SpeechmaticsFlowException
 import com.speechmatics.sdk.flow.models.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.*
 
@@ -84,7 +86,7 @@ class FlowClientTest {
         val buffer = JitterBuffer(maxByteLength = 200)
         var flushed = false
 
-        kotlinx.coroutines.launch {
+        val job = launch {
             buffer.flushEvents.collect {
                 flushed = true
             }
@@ -95,7 +97,8 @@ class FlowClientTest {
         buffer.enqueue(ShortArray(1) { 0 }) // Trigger flush
 
         // Allow time for flush event
-        kotlinx.coroutines.delay(100)
+        delay(100)
+        job.cancel()
 
         assertThat(buffer.byteLength).isLessThan(200)
     }

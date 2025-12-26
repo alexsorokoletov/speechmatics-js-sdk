@@ -13,7 +13,7 @@ class ModelsTest {
 
     private val json = Json {
         ignoreUnknownKeys = true
-        encodeDefaults = false
+        encodeDefaults = true
         explicitNulls = false
     }
 

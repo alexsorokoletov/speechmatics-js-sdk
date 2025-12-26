@@ -1,10 +1,17 @@
-name: Build and Test
+name: Android SDK Build and Test
 
 on:
   push:
-    branches: [ main, develop ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-build.yml'
   pull_request:
-    branches: [ main ]
+    paths:
+      - 'android/**'
+
+defaults:
+  run:
+    working-directory: android
 
 jobs:
   build:
@@ -36,8 +43,8 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-reports
-        path: build/reports/tests/
+        name: android-test-reports
+        path: android/build/reports/tests/
 
   publish:
     needs: build

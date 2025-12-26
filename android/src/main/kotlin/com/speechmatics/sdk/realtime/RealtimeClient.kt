@@ -54,6 +54,7 @@ class RealtimeClient(
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
+        explicitNulls = false  // Don't send null values
         classDiscriminator = "message"
     }
 

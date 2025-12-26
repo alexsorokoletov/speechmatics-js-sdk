@@ -88,7 +88,8 @@ class RealtimeClient(
     suspend fun start(
         jwt: String,
         transcriptionConfig: RealtimeTranscriptionConfig,
-        audioFormat: AudioFormatConfig = AudioFormatConfig()
+        audioFormat: AudioFormatConfig = AudioFormatConfig(),
+        translationConfig: RealtimeTranslationConfig? = null
     ): RecognitionStarted = withContext(Dispatchers.IO) {
         // Connect WebSocket
         connect(jwt)
@@ -98,7 +99,8 @@ class RealtimeClient(
             val job = scope.launch {
                 val startMessage = StartRecognition(
                     audioFormat = audioFormat,
-                    transcriptionConfig = transcriptionConfig
+                    transcriptionConfig = transcriptionConfig,
+                    translationConfig = translationConfig
                 )
                 sendMessage(startMessage)
 

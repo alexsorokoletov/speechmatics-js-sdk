@@ -23,7 +23,9 @@ data class StartRecognition(
     @SerialName("audio_format")
     val audioFormat: AudioFormatConfig = AudioFormatConfig(),
     @SerialName("transcription_config")
-    val transcriptionConfig: RealtimeTranscriptionConfig
+    val transcriptionConfig: RealtimeTranscriptionConfig,
+    @SerialName("translation_config")
+    val translationConfig: RealtimeTranslationConfig? = null
 ) : RealtimeClientMessage
 
 @Serializable
@@ -238,9 +240,7 @@ data class RealtimeTranscriptionConfig(
     @SerialName("enable_entities")
     val enableEntities: Boolean? = null,
     @SerialName("operating_point")
-    val operatingPoint: String? = null,
-    @SerialName("translation_config")
-    val translationConfig: RealtimeTranslationConfig? = null
+    val operatingPoint: String? = null
 )
 
 @Serializable

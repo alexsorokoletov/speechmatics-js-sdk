@@ -22,7 +22,7 @@ Add the GitHub Packages repository and dependency to your `build.gradle.kts`:
 ```kotlin
 repositories {
     maven {
-        url = uri("https://maven.pkg.github.com/dreamteam-oss/speechmatics-android")
+        url = uri("https://maven.pkg.github.com/alexsorokoletov/speechmatics-kotlin-sdk")
         credentials {
             username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
             password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
@@ -219,5 +219,5 @@ community use.
 
 ## Support
 
-- Issues: https://github.com/dreamteam-oss/speechmatics-android/issues
+- Issues: https://github.com/alexsorokoletov/speechmatics-kotlin-sdk/issues
 - Speechmatics API Docs: https://docs.speechmatics.com

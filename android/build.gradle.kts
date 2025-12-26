@@ -97,7 +97,7 @@ publishing {
             pom {
                 name.set("Speechmatics Android SDK (Unofficial)")
                 description.set("Unofficial Android SDK for Speechmatics speech recognition APIs - Community maintained")
-                url.set("https://github.com/dreamteam-oss/speechmatics-android")
+                url.set("https://github.com/alexsorokoletov/speechmatics-kotlin-sdk")
 
                 licenses {
                     license {
@@ -108,15 +108,15 @@ publishing {
 
                 developers {
                     developer {
-                        id.set("dreamteam")
-                        name.set("DreamTeam OSS")
+                        id.set("alexsorokoletov")
+                        name.set("Alex Sorokoletov")
                     }
                 }
 
                 scm {
-                    connection.set("scm:git:git://github.com/dreamteam-oss/speechmatics-android.git")
-                    developerConnection.set("scm:git:ssh://github.com/dreamteam-oss/speechmatics-android.git")
-                    url.set("https://github.com/dreamteam-oss/speechmatics-android")
+                    connection.set("scm:git:git://github.com/alexsorokoletov/speechmatics-kotlin-sdk.git")
+                    developerConnection.set("scm:git:ssh://github.com/alexsorokoletov/speechmatics-kotlin-sdk.git")
+                    url.set("https://github.com/alexsorokoletov/speechmatics-kotlin-sdk")
                 }
             }
         }
@@ -125,7 +125,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/alexsorokoletov/speechmatics-js-sdk")
+            url = uri("https://maven.pkg.github.com/alexsorokoletov/speechmatics-kotlin-sdk")
             credentials {
                 username = System.getenv("GITHUB_ACTOR") ?: project.findProperty("gpr.user") as String? ?: ""
                 password = System.getenv("GITHUB_TOKEN") ?: project.findProperty("gpr.token") as String? ?: ""

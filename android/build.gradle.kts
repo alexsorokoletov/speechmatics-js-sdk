@@ -86,8 +86,8 @@ tasks.withType<Test> {
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "com.speechmatics"
-            artifactId = "speechmatics-android-sdk"
+            groupId = "dev.dreamteam"
+            artifactId = "speechmatics-android"
             version = "1.0.0"
 
             afterEvaluate {
@@ -95,9 +95,9 @@ publishing {
             }
 
             pom {
-                name.set("Speechmatics Android SDK")
-                description.set("Android SDK for Speechmatics speech recognition APIs")
-                url.set("https://github.com/speechmatics/speechmatics-android-sdk")
+                name.set("Speechmatics Android SDK (Unofficial)")
+                description.set("Unofficial Android SDK for Speechmatics speech recognition APIs - Community maintained")
+                url.set("https://github.com/dreamteam-oss/speechmatics-android")
 
                 licenses {
                     license {
@@ -108,16 +108,15 @@ publishing {
 
                 developers {
                     developer {
-                        id.set("speechmatics")
-                        name.set("Speechmatics")
-                        email.set("support@speechmatics.com")
+                        id.set("dreamteam")
+                        name.set("DreamTeam OSS")
                     }
                 }
 
                 scm {
-                    connection.set("scm:git:git://github.com/speechmatics/speechmatics-android-sdk.git")
-                    developerConnection.set("scm:git:ssh://github.com/speechmatics/speechmatics-android-sdk.git")
-                    url.set("https://github.com/speechmatics/speechmatics-android-sdk")
+                    connection.set("scm:git:git://github.com/dreamteam-oss/speechmatics-android.git")
+                    developerConnection.set("scm:git:ssh://github.com/dreamteam-oss/speechmatics-android.git")
+                    url.set("https://github.com/dreamteam-oss/speechmatics-android")
                 }
             }
         }
@@ -126,7 +125,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/speechmatics/speechmatics-android-sdk")
+            url = uri("https://maven.pkg.github.com/alexsorokoletov/speechmatics-js-sdk")
             credentials {
                 username = System.getenv("GITHUB_ACTOR") ?: project.findProperty("gpr.user") as String? ?: ""
                 password = System.getenv("GITHUB_TOKEN") ?: project.findProperty("gpr.token") as String? ?: ""

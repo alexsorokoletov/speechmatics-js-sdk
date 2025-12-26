@@ -1,6 +1,8 @@
-# Speechmatics Android SDK
+# Speechmatics Android SDK (Unofficial)
 
-Official Android SDK for Speechmatics speech recognition APIs. This SDK provides access to:
+> **Note:** This is an unofficial, community-maintained Android SDK for Speechmatics APIs. It is not affiliated with or endorsed by Speechmatics Ltd. For official SDKs, visit [speechmatics.com](https://speechmatics.com).
+
+Kotlin Android SDK for Speechmatics speech recognition APIs. This SDK provides access to:
 
 - **Batch Transcription** - Upload audio files for asynchronous transcription
 - **Real-time Transcription** - Stream audio for live transcription via WebSocket
@@ -15,11 +17,21 @@ Official Android SDK for Speechmatics speech recognition APIs. This SDK provides
 
 ## Installation
 
-Add the dependency to your `build.gradle.kts`:
+Add the GitHub Packages repository and dependency to your `build.gradle.kts`:
 
 ```kotlin
+repositories {
+    maven {
+        url = uri("https://maven.pkg.github.com/dreamteam-oss/speechmatics-android")
+        credentials {
+            username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+            password = project.findProperty("gpr.token") as String? ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
+}
+
 dependencies {
-    implementation("com.speechmatics:speechmatics-android-sdk:1.0.0")
+    implementation("dev.dreamteam:speechmatics-android:1.0.0")
 }
 ```
 
@@ -116,12 +128,6 @@ when (result) {
         println(result.text)
     }
 }
-
-// Or use URL input
-val urlResult = client.transcribe(
-    input = JobInput.UrlInput(url = "https://example.com/audio.wav"),
-    transcriptionConfig = TranscriptionConfig(language = "en")
-)
 ```
 
 ### Flow API (Conversational AI)
@@ -166,126 +172,52 @@ val recorder = AudioRecorder(
         sampleRate = 16000,
         encoding = AudioEncodingFormat.PCM_16BIT,
         echoCancellation = true,
-        noiseSuppression = true,
-        autoGainControl = true
+        noiseSuppression = true
     )
 )
 
-// Start recording
 recorder.startRecording()
 
-// Collect audio data
 launch {
     recorder.audioDataPcm16.collect { data ->
-        // Send to transcription
         realtimeClient.sendAudio(data)
     }
 }
 
-// Stop recording
 recorder.stopRecording()
-
-// Release resources
 recorder.release()
 ```
 
 ### Audio Playback
 
 ```kotlin
-val player = AudioPlayer(
-    AudioPlayerConfig(
-        sampleRate = 16000,
-        initialVolume = 100
-    )
-)
+val player = AudioPlayer(AudioPlayerConfig(sampleRate = 16000))
 
-// Play audio (ShortArray, FloatArray, or ByteArray)
 player.play(audioData)
-
-// Adjust volume
 player.setVolume(80)
-
-// Stop and release
 player.stop()
 player.release()
 ```
 
 ## API Reference
 
-### SpeechmaticsAuth
-
-| Method | Description |
-|--------|-------------|
-| `generateToken(type, ttl, region, clientRef)` | Generate a temporary JWT token |
-
-### BatchClient
-
-| Method | Description |
-|--------|-------------|
-| `transcribe(input, config, format, timeout)` | Transcribe audio file (blocking) |
-| `createTranscriptionJob(input, config)` | Create transcription job |
-| `getJob(jobId)` | Get job status |
-| `getJobResult(jobId, format)` | Get transcription result |
-| `listJobs(filters)` | List all jobs |
-| `deleteJob(jobId, force)` | Delete a job |
-
-### RealtimeClient
-
-| Method | Description |
-|--------|-------------|
-| `start(jwt, config, audioFormat)` | Start transcription session |
-| `sendAudio(data)` | Send audio data |
-| `stopRecognition(noTimeout)` | Stop transcription |
-| `setRecognitionConfig(config)` | Update config mid-session |
-| `getSpeakers(final, timeout)` | Get speaker information |
-| `close()` | Close connection |
-
-### FlowClient
-
-| Method | Description |
-|--------|-------------|
-| `startConversation(jwt, config, audioFormat)` | Start conversation |
-| `sendAudio(data)` | Send audio data |
-| `endConversation()` | End conversation |
-| `close()` | Close connection |
-
-### AudioRecorder
-
-| Method | Description |
-|--------|-------------|
-| `hasPermission(context)` | Check if RECORD_AUDIO permission granted |
-| `startRecording()` | Start recording |
-| `stopRecording()` | Stop recording |
-| `release()` | Release all resources |
-
-### AudioPlayer
-
-| Method | Description |
-|--------|-------------|
-| `initialize()` | Initialize AudioTrack |
-| `play(data)` | Play audio data |
-| `setVolume(percent)` | Set volume (0-100) |
-| `pause()` | Pause playback |
-| `stop()` | Stop playback |
-| `release()` | Release all resources |
-
-## Supported Audio Formats
-
-| Format | Recording | Playback | WebSocket |
-|--------|-----------|----------|-----------|
-| PCM 16-bit LE | ✓ | ✓ | ✓ |
-| PCM Float32 | ✓ | ✓ | ✓ |
+See the source code for full API documentation.
 
 ## Example
 
-See [docs/EXAMPLE_UI.md](docs/EXAMPLE_UI.md) for a complete Jetpack Compose example.
+See [docs/EXAMPLE_UI.md](docs/EXAMPLE_UI.md) for a Jetpack Compose example.
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License
+
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or connected to Speechmatics Ltd.
+"Speechmatics" is a trademark of Speechmatics Ltd. This SDK is provided as-is for
+community use.
 
 ## Support
 
-- Documentation: https://docs.speechmatics.com
-- Issues: https://github.com/speechmatics/speechmatics-android-sdk/issues
-- Email: support@speechmatics.com
+- Issues: https://github.com/dreamteam-oss/speechmatics-android/issues
+- Speechmatics API Docs: https://docs.speechmatics.com

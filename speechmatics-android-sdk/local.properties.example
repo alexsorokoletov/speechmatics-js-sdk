@@ -1,0 +1,12 @@
+# Local SDK configuration
+# Copy this file to local.properties and configure for your system
+
+# Android SDK location (required)
+# Windows example: sdk.dir=C:\\Users\\USERNAME\\AppData\\Local\\Android\\Sdk
+# macOS example: sdk.dir=/Users/USERNAME/Library/Android/sdk
+# Linux example: sdk.dir=/home/USERNAME/Android/Sdk
+sdk.dir=/path/to/your/android/sdk
+
+# Optional: GitHub Packages credentials for publishing
+# gpr.user=your-github-username
+# gpr.token=your-github-token

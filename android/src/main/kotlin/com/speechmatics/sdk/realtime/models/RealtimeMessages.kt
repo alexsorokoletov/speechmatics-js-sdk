@@ -240,7 +240,15 @@ data class RealtimeTranscriptionConfig(
     @SerialName("enable_entities")
     val enableEntities: Boolean? = null,
     @SerialName("operating_point")
-    val operatingPoint: String? = null
+    val operatingPoint: String? = null,
+    @SerialName("transcript_filtering_config")
+    val transcriptFilteringConfig: TranscriptFilteringConfig? = null
+)
+
+@Serializable
+data class TranscriptFilteringConfig(
+    @SerialName("remove_disfluencies")
+    val removeDisfluencies: Boolean? = null
 )
 
 @Serializable
@@ -253,7 +261,9 @@ data class AdditionalVocabItem(
 @Serializable
 data class RealtimeSpeakerDiarizationConfig(
     @SerialName("max_speakers")
-    val maxSpeakers: Int? = null
+    val maxSpeakers: Int? = null,
+    @SerialName("get_speakers")
+    val getSpeakers: Boolean? = null
 )
 
 @Serializable

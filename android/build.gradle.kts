@@ -88,7 +88,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "dev.dreamteam"
             artifactId = "speechmatics-android"
-            version = "1.0.2"
+            version = "1.0.3"
 
             afterEvaluate {
                 from(components["release"])

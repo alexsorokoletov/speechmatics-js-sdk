@@ -1,6 +1,6 @@
 # Example: Real-Time Transcription with Jetpack Compose
 
-This document provides a complete example of how to build a real-time transcription UI using the Speechmatics Android SDK with Jetpack Compose.
+This document provides a complete example of how to build a real-time transcription UI using the Speechmatics Android SDK with Jetpack Compose, including speaker diarization and proper text formatting.
 
 ## Prerequisites
 
@@ -8,7 +8,7 @@ This document provides a complete example of how to build a real-time transcript
 
 ```kotlin
 dependencies {
-    implementation("com.speechmatics:speechmatics-android-sdk:1.0.0")
+    implementation("dev.dreamteam:speechmatics-android:1.0.0")
 }
 ```
 
@@ -19,7 +19,32 @@ dependencies {
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
 
-## Complete Example Component
+## Architecture Overview
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   Your Backend  │────▶│  Android App    │────▶│  Speechmatics   │
+│  (API Key here) │     │  (JWT token)    │     │  WebSocket API  │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+        │                       │                       │
+        │ POST /v1/api_keys     │ start(jwt, config)    │
+        │ Returns JWT           │ sendAudio(bytes)      │
+        │                       │◀──────────────────────│
+        │                       │ AddTranscript         │
+        │                       │ AddPartialTranscript  │
+        │                       │ EndOfTranscript       │
+```
+
+## Message Types
+
+| Message | Description |
+|---------|-------------|
+| `AddPartialTranscript` | Interim results that may change as more audio is processed |
+| `AddTranscript` | Final, confirmed transcript segment |
+| `EndOfTranscript` | All audio has been processed, safe to disconnect |
+| `RealtimeError` | Error occurred during transcription |
+
+## Complete Example
 
 ```kotlin
 package com.example.transcription
@@ -35,7 +60,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -43,31 +73,29 @@ import androidx.lifecycle.viewModelScope
 import com.speechmatics.sdk.audio.AudioRecorder
 import com.speechmatics.sdk.audio.AudioRecorderConfig
 import com.speechmatics.sdk.audio.AudioEncodingFormat
-import com.speechmatics.sdk.auth.ApiType
-import com.speechmatics.sdk.auth.SpeechmaticsAuth
 import com.speechmatics.sdk.common.AudioEncoding
 import com.speechmatics.sdk.common.AudioFormatConfig
 import com.speechmatics.sdk.common.AudioType
 import com.speechmatics.sdk.realtime.RealtimeClient
 import com.speechmatics.sdk.realtime.RealtimeClientOptions
 import com.speechmatics.sdk.realtime.models.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * ViewModel for managing real-time transcription state
+ * ViewModel for managing real-time transcription with speaker diarization
  */
-class TranscriptionViewModel : ViewModel() {
-
-    // Configuration - replace with your API key
-    private val apiKey = "YOUR_API_KEY"
+class TranscriptionViewModel(
+    private val tokenProvider: suspend () -> String  // Inject your backend token fetcher
+) : ViewModel() {
 
     // Clients
-    private val auth = SpeechmaticsAuth(apiKey)
     private val realtimeClient = RealtimeClient(
         RealtimeClientOptions(
             url = "wss://eu2.rt.speechmatics.com/v2",
-            appId = "android-example"
+            appId = "my-app"
         )
     )
     private val audioRecorder = AudioRecorder(
@@ -83,9 +111,11 @@ class TranscriptionViewModel : ViewModel() {
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
-    private val _transcript = MutableStateFlow("")
-    val transcript: StateFlow<String> = _transcript.asStateFlow()
+    // Accumulated final transcript (confirmed text)
+    private val _finalTranscript = MutableStateFlow("")
+    val finalTranscript: StateFlow<String> = _finalTranscript.asStateFlow()
 
+    // Current partial (unconfirmed, may change)
     private val _partialTranscript = MutableStateFlow("")
     val partialTranscript: StateFlow<String> = _partialTranscript.asStateFlow()
 
@@ -95,35 +125,82 @@ class TranscriptionViewModel : ViewModel() {
     private val _isConnecting = MutableStateFlow(false)
     val isConnecting: StateFlow<Boolean> = _isConnecting.asStateFlow()
 
+    // Track current speaker for formatting
+    private var lastFinalSpeaker: String? = null
+    private var endOfTranscriptDeferred: CompletableDeferred<Unit>? = null
+
     init {
         // Collect messages from the realtime client
         viewModelScope.launch {
             realtimeClient.messages.collect { message ->
-                when (message) {
-                    is AddTranscript -> {
-                        val text = message.results
-                            .mapNotNull { result ->
-                                result.alternatives?.firstOrNull()?.content
-                            }
-                            .joinToString(" ")
-                        _transcript.value += text + " "
-                        _partialTranscript.value = ""
-                    }
-                    is AddPartialTranscript -> {
-                        val text = message.results
-                            .mapNotNull { result ->
-                                result.alternatives?.firstOrNull()?.content
-                            }
-                            .joinToString(" ")
-                        _partialTranscript.value = text
-                    }
-                    is RealtimeError -> {
-                        _error.value = "Error: ${message.type} - ${message.reason}"
-                    }
-                    else -> { /* Handle other messages */ }
-                }
+                handleMessage(message)
             }
         }
+    }
+
+    private fun handleMessage(message: RealtimeMessage) {
+        when (message) {
+            is AddTranscript -> {
+                // Final transcript - append to accumulated text
+                val (text, speaker) = buildTranscriptText(message.results, lastFinalSpeaker)
+                _finalTranscript.value += text
+                _partialTranscript.value = ""
+                lastFinalSpeaker = speaker
+            }
+            is AddPartialTranscript -> {
+                // Partial - show but don't accumulate (will be replaced)
+                val (text, _) = buildTranscriptText(message.results, lastFinalSpeaker)
+                _partialTranscript.value = text
+            }
+            is EndOfTranscript -> {
+                // All audio processed
+                endOfTranscriptDeferred?.complete(Unit)
+            }
+            is RealtimeError -> {
+                _error.value = "Error: ${message.type} - ${message.reason}"
+            }
+            else -> { /* RecognitionStarted, AudioAdded, etc. */ }
+        }
+    }
+
+    /**
+     * Build formatted transcript text with speaker labels.
+     * Returns the formatted text and the last speaker encountered.
+     */
+    private fun buildTranscriptText(
+        results: List<RecognitionResult>,
+        previousSpeaker: String?
+    ): Pair<String, String?> {
+        val sb = StringBuilder()
+        var currentSpeaker = previousSpeaker
+
+        for (result in results) {
+            // Get speaker from alternatives or result
+            val speaker = result.alternatives?.firstOrNull()?.speaker ?: result.speaker
+
+            // Add speaker label on change
+            if (speaker != null && speaker != currentSpeaker) {
+                if (sb.isNotEmpty() || _finalTranscript.value.isNotEmpty()) {
+                    sb.append("\n\n")
+                }
+                sb.append("$speaker: ")
+                currentSpeaker = speaker
+            }
+
+            // Get word content
+            val content = result.alternatives?.firstOrNull()?.content ?: result.content ?: continue
+
+            // Add spacing for words (not punctuation)
+            if (result.type == RecognitionResultType.WORD) {
+                if (sb.isNotEmpty() && !sb.endsWith(": ") && !sb.endsWith("\n")) {
+                    sb.append(" ")
+                }
+            }
+
+            sb.append(content)
+        }
+
+        return Pair(sb.toString(), currentSpeaker)
     }
 
     fun startTranscription() {
@@ -131,19 +208,24 @@ class TranscriptionViewModel : ViewModel() {
             try {
                 _isConnecting.value = true
                 _error.value = null
-                _transcript.value = ""
+                _finalTranscript.value = ""
                 _partialTranscript.value = ""
+                lastFinalSpeaker = null
 
-                // Generate JWT token
-                val jwt = auth.generateToken(type = ApiType.REALTIME)
+                // Get JWT from backend (keeps API key secure)
+                val jwt = tokenProvider()
 
-                // Start transcription
+                // Start transcription with speaker diarization
                 realtimeClient.start(
                     jwt = jwt,
                     transcriptionConfig = RealtimeTranscriptionConfig(
                         language = "en",
                         enablePartials = true,
-                        maxDelay = 2.0
+                        operatingPoint = "enhanced",
+                        diarization = "speaker",
+                        speakerDiarizationConfig = RealtimeSpeakerDiarizationConfig(
+                            maxSpeakers = 10
+                        )
                     ),
                     audioFormat = AudioFormatConfig(
                         type = AudioType.RAW,
@@ -157,7 +239,7 @@ class TranscriptionViewModel : ViewModel() {
                 _isRecording.value = true
                 _isConnecting.value = false
 
-                // Send audio to transcription service
+                // Stream audio to transcription service
                 audioRecorder.audioDataPcm16.collect { audioData ->
                     realtimeClient.sendAudio(audioData)
                 }
@@ -173,11 +255,24 @@ class TranscriptionViewModel : ViewModel() {
     fun stopTranscription() {
         viewModelScope.launch {
             try {
+                // Stop recording first
                 audioRecorder.stopRecording()
-                realtimeClient.stopRecognition()
+
+                // Signal end of audio and wait for final transcripts
+                endOfTranscriptDeferred = CompletableDeferred()
+                realtimeClient.stopRecognition(noTimeout = true)
+
+                // Wait for EndOfTranscript (with timeout)
+                withTimeoutOrNull(3000) {
+                    endOfTranscriptDeferred?.await()
+                }
+
                 _isRecording.value = false
+                endOfTranscriptDeferred = null
+
             } catch (e: Exception) {
                 _error.value = e.message
+                _isRecording.value = false
             }
         }
     }
@@ -190,18 +285,24 @@ class TranscriptionViewModel : ViewModel() {
 }
 
 /**
- * Composable UI for real-time transcription
+ * Composable UI for real-time transcription with styled output
  */
 @Composable
 fun RealtimeTranscriptionScreen(
-    viewModel: TranscriptionViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    viewModel: TranscriptionViewModel
 ) {
     val context = LocalContext.current
     val isRecording by viewModel.isRecording.collectAsState()
     val isConnecting by viewModel.isConnecting.collectAsState()
-    val transcript by viewModel.transcript.collectAsState()
+    val finalTranscript by viewModel.finalTranscript.collectAsState()
     val partialTranscript by viewModel.partialTranscript.collectAsState()
     val error by viewModel.error.collectAsState()
+    val scrollState = rememberScrollState()
+
+    // Auto-scroll to bottom when transcript updates
+    LaunchedEffect(finalTranscript, partialTranscript) {
+        scrollState.animateScrollTo(scrollState.maxValue)
+    }
 
     var hasPermission by remember {
         mutableStateOf(
@@ -248,7 +349,7 @@ fun RealtimeTranscriptionScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Transcript display
+        // Transcript display with styled text
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -258,19 +359,21 @@ fun RealtimeTranscriptionScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
             ) {
+                // Styled transcript with speaker labels bold
                 Text(
-                    text = transcript,
+                    text = buildAnnotatedString {
+                        // Final transcript (confirmed) - normal styling
+                        appendStyledTranscript(finalTranscript, isPartial = false)
+
+                        // Partial transcript (unconfirmed) - gray/italic
+                        if (partialTranscript.isNotEmpty()) {
+                            appendStyledTranscript(partialTranscript, isPartial = true)
+                        }
+                    },
                     style = MaterialTheme.typography.bodyLarge
                 )
-                if (partialTranscript.isNotEmpty()) {
-                    Text(
-                        text = partialTranscript,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
 
@@ -327,6 +430,78 @@ fun RealtimeTranscriptionScreen(
         )
     }
 }
+
+/**
+ * Extension to append styled transcript text.
+ * Speaker labels (e.g., "S1:") are bold, partials are gray.
+ */
+@Composable
+private fun AnnotatedString.Builder.appendStyledTranscript(
+    text: String,
+    isPartial: Boolean
+) {
+    val speakerPattern = Regex("(S\\d+):")
+    var lastEnd = 0
+
+    speakerPattern.findAll(text).forEach { match ->
+        // Append text before speaker label
+        if (match.range.first > lastEnd) {
+            val beforeText = text.substring(lastEnd, match.range.first)
+            if (isPartial) {
+                withStyle(SpanStyle(color = Color.Gray)) {
+                    append(beforeText)
+                }
+            } else {
+                append(beforeText)
+            }
+        }
+
+        // Append speaker label in bold
+        withStyle(
+            SpanStyle(
+                fontWeight = FontWeight.Bold,
+                color = if (isPartial) Color.Gray else Color.Unspecified
+            )
+        ) {
+            append(match.value)
+        }
+
+        lastEnd = match.range.last + 1
+    }
+
+    // Append remaining text
+    if (lastEnd < text.length) {
+        val remaining = text.substring(lastEnd)
+        if (isPartial) {
+            withStyle(SpanStyle(color = Color.Gray)) {
+                append(remaining)
+            }
+        } else {
+            append(remaining)
+        }
+    }
+}
+```
+
+## UI Styling
+
+The example above demonstrates:
+
+1. **Final vs Partial text**: Final transcript is shown in normal color, partial (unconfirmed) text is shown in gray
+2. **Speaker labels**: Speaker labels like "S1:" are rendered in bold
+3. **Auto-scroll**: Transcript automatically scrolls to show newest text
+4. **Speaker separation**: Double newlines between different speakers for readability
+
+**Visual Example:**
+
+```
+┌──────────────────────────────────────┐
+│ S1: Hello, welcome to the meeting.   │  ← Final (black, bold label)
+│                                      │
+│ S2: Thanks for having me today.      │  ← Final (black, bold label)
+│                                      │
+│ S1: Let's discuss the project        │  ← Partial (gray, still typing)
+└──────────────────────────────────────┘
 ```
 
 ## Flow Conversational AI Example
@@ -334,10 +509,10 @@ fun RealtimeTranscriptionScreen(
 For using the Flow API (conversational AI), here's a similar example:
 
 ```kotlin
-class FlowViewModel : ViewModel() {
-    private val apiKey = "YOUR_API_KEY"
+class FlowViewModel(
+    private val tokenProvider: suspend () -> String
+) : ViewModel() {
 
-    private val auth = SpeechmaticsAuth(apiKey)
     private val flowClient = FlowClient(
         serverUrl = "wss://flow.api.speechmatics.com",
         options = FlowClientOptions(
@@ -381,7 +556,7 @@ class FlowViewModel : ViewModel() {
     fun startConversation() {
         viewModelScope.launch {
             try {
-                val jwt = auth.generateToken(type = ApiType.FLOW)
+                val jwt = tokenProvider()
 
                 flowClient.startConversation(
                     jwt = jwt,

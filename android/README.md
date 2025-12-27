@@ -48,13 +48,29 @@ Add to your `AndroidManifest.xml`:
 
 ### Authentication
 
-Generate temporary JWT tokens for client-side API access:
+> **Security Best Practice**: Never embed API keys in mobile apps. Use a backend server to generate short-lived JWT tokens.
+
+#### Option 1: Backend Token Generation (Recommended)
+
+Your backend server generates temporary tokens using the Speechmatics Management Platform API, keeping the long-lived API key secure on the server. The mobile app receives only short-lived JWT tokens.
+
+See [Speechmatics Authentication Docs](https://docs.speechmatics.com/introduction/authentication) for backend implementation details.
+
+```kotlin
+// Fetch short-lived token from your backend, then use it
+val token = yourBackendService.getTranscriptionToken()
+realtimeClient.start(jwt = token, ...)
+```
+
+#### Option 2: Client-Side Token Generation (Development Only)
+
+For local development/testing only - **do not use in production**:
 
 ```kotlin
 val auth = SpeechmaticsAuth(apiKey = "YOUR_API_KEY")
 
 // For real-time transcription
-val rtToken = auth.generateToken(type = ApiType.REALTIME)
+val rtToken = auth.generateToken(type = ApiType.REALTIME, ttl = 300)
 
 // For batch transcription (requires clientRef)
 val batchToken = auth.generateToken(
@@ -76,12 +92,22 @@ val client = RealtimeClient(
     )
 )
 
-// Start transcription
-val result = client.start(
+// Start transcription with speaker diarization
+client.start(
     jwt = token,
     transcriptionConfig = RealtimeTranscriptionConfig(
         language = "en",
-        enablePartials = true
+        enablePartials = true,
+        operatingPoint = "enhanced",
+        diarization = "speaker",
+        speakerDiarizationConfig = RealtimeSpeakerDiarizationConfig(
+            maxSpeakers = 10
+        )
+    ),
+    audioFormat = AudioFormatConfig(
+        type = AudioType.RAW,
+        encoding = AudioEncoding.PCM_S16LE,
+        sampleRate = 16000
     )
 )
 
@@ -90,10 +116,21 @@ launch {
     client.messages.collect { message ->
         when (message) {
             is AddTranscript -> {
-                println("Final: ${message.results}")
+                // Final transcript with speaker labels
+                val text = buildTranscriptText(message.results)
+                println("Final: $text")
             }
             is AddPartialTranscript -> {
-                println("Partial: ${message.results}")
+                // Interim results (may change)
+                val text = buildTranscriptText(message.results)
+                println("Partial: $text")
+            }
+            is EndOfTranscript -> {
+                // All audio processed, safe to disconnect
+                println("Transcription complete")
+            }
+            is RealtimeError -> {
+                println("Error: ${message.type} - ${message.reason}")
             }
         }
     }
@@ -102,8 +139,89 @@ launch {
 // Send audio data
 client.sendAudio(audioData) // ShortArray, FloatArray, or ByteArray
 
-// Stop transcription
+// Stop transcription (waits for EndOfTranscript)
 client.stopRecognition()
+```
+
+#### Processing Recognition Results
+
+Each `AddTranscript` or `AddPartialTranscript` message contains a list of `RecognitionResult` objects:
+
+```kotlin
+fun buildTranscriptText(results: List<RecognitionResult>): String {
+    val sb = StringBuilder()
+    var currentSpeaker: String? = null
+
+    for (result in results) {
+        // Get speaker label (e.g., "S1", "S2")
+        val speaker = result.alternatives?.firstOrNull()?.speaker
+
+        // Add speaker label on change
+        if (speaker != null && speaker != currentSpeaker) {
+            if (sb.isNotEmpty()) sb.append("\n\n")
+            sb.append("$speaker: ")
+            currentSpeaker = speaker
+        }
+
+        // Get word content
+        val content = result.alternatives?.firstOrNull()?.content ?: continue
+
+        // Add spacing for words (not punctuation)
+        if (result.type == RecognitionResultType.WORD && sb.isNotEmpty() &&
+            !sb.endsWith(": ") && !sb.endsWith("\n")) {
+            sb.append(" ")
+        }
+
+        sb.append(content)
+    }
+
+    return sb.toString()
+}
+```
+
+**Example output:**
+```
+S1: Hello, how are you today?
+
+S2: I'm doing great, thanks for asking.
+
+S1: That's wonderful to hear.
+```
+
+#### Common Patterns
+
+**Pattern 1: Accumulate Finals During Stream**
+
+```kotlin
+val transcriptStore = mutableListOf<AddTranscript>()
+
+client.messages.collect { message ->
+    when (message) {
+        is AddTranscript -> {
+            // Each message has speaker labels, timestamps, words
+            transcriptStore.add(message)
+        }
+        is EndOfTranscript -> {
+            // Meeting done - full diarized transcript ready
+            saveFinalTranscript(transcriptStore)
+        }
+    }
+}
+```
+
+**Pattern 2: Get Speaker IDs at End**
+
+Enable `getSpeakers = true` in diarization config to receive speaker metadata only once at the end (more efficient for long recordings):
+
+```kotlin
+RealtimeTranscriptionConfig(
+    language = "en",
+    diarization = "speaker",
+    speakerDiarizationConfig = RealtimeSpeakerDiarizationConfig(
+        maxSpeakers = 10,
+        getSpeakers = true  // Speaker IDs returned at end only
+    )
+)
 ```
 
 ### Batch Transcription

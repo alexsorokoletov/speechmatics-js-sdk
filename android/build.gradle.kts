@@ -10,7 +10,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        minSdk = 30
+        minSdk = 24
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -88,7 +88,7 @@ publishing {
         register<MavenPublication>("release") {
             groupId = "dev.dreamteam"
             artifactId = "speechmatics-android"
-            version = "1.0.3"
+            version = "1.0.4"
 
             afterEvaluate {
                 from(components["release"])

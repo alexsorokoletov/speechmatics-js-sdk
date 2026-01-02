@@ -130,7 +130,7 @@ data class SpeakersResult(
 
 @Serializable
 data class SpeakerInfo(
-    val id: String,
+    val id: String? = null,
     val name: String? = null
 )
 
